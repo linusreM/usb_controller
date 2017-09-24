@@ -5,7 +5,7 @@ Check initialization of buttons
 
 Initialization of potentiometers
 	
-	Program som skannar igenom alla värden 
+	Program som skannar igenom alla värden - funkar lite
 	
 Check that USB-com is working
 
@@ -21,9 +21,9 @@ EEprom emulation
 	
 Wire up buttons/potentiometers
 
-	Skruva fast potentiometrar, löd ihop VCC till varandra och GND till varandra
+	Skruva fast potentiometrar, löd ihop VCC till varandra och GND till varandra - DONE
 	
-	knappmatris
+	knappmatris - DONE
 	
 write main program
 

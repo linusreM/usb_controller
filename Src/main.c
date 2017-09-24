@@ -49,6 +49,7 @@
 #include "main.h"
 #include "stm32f1xx_hal.h"
 #include "usb_device.h"
+#include "USBkeys.h"
 
 /* USER CODE BEGIN Includes */
 
@@ -69,10 +70,14 @@ static void MX_ADC1_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-
+uint8_t USBD_CUSTOM_HID_SendReport     (USBD_HandleTypeDef  *pdev,
+                                 uint8_t *report,
+                                 uint16_t len);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
+void ADCChangeChannel(uint32_t channel);
+uint32_t ADCNext(uint32_t adcnow);
 
 /* USER CODE END 0 */
 
@@ -80,6 +85,29 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+	 /* USER CODE BEGIN 1 */
+	struct customHID_t {					//USB HID Data report structure"!!ZYYY______
+		uint8_t buttons;
+		int8_t x;
+		int8_t y;
+		int8_t wheel;
+		uint8_t modifier; //LeftControl, LeftShift, LeftAlt, Left GUI, RightControl,  RightShift, RightAlt, RightGUI
+		int8_t key[6];
+	};
+	struct customHID_t customHID;
+	customHID.buttons = 0;
+	customHID.x = 0;
+	customHID.y = 0;
+	customHID.wheel = 0;
+	customHID.modifier = 0;
+	customHID.key[0] = 0;
+	customHID.key[1] = 0;
+	customHID.key[2] = 0;
+	customHID.key[3] = 0;
+	customHID.key[4] = 0;
+	customHID.key[5] = 0;
+
+
 
   /* USER CODE END 1 */
 
@@ -104,10 +132,29 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_ADC1_Init();
 
+
+
   /* USER CODE BEGIN 2 */
+  uint32_t adc_chan[6] = {ADC_CHANNEL_1,
+ 		  	  	  	  	  ADC_CHANNEL_2,
+ 						  ADC_CHANNEL_3,
+ 						  ADC_CHANNEL_4,
+ 						  ADC_CHANNEL_5,
+ 						  ADC_CHANNEL_6};
 
+  static uint32_t adc_temp[6] = {0,0,0,0,0,0};
+  static uint32_t adc_current = 0;
+  static uint8_t adc_num = 0;
+
+  //initialize adc values
+  while(adc_num < 6 ){
+	  adc_temp[adc_num] = ADCNext(adc_chan[adc_num]);
+	  adc_num++;
+  }
+  adc_num = 0; //adc back to channel 0
   /* USER CODE END 2 */
-
+  static uint8_t now = 0;
+  static uint8_t then = 0;
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -115,6 +162,44 @@ int main(void)
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
+
+
+
+
+
+	  now = adc_current/512;
+	  then = adc_temp[adc_num]/512;
+
+	  if(now != then){
+
+		  customHID.key[0] = A_KEY + now;
+		  customHID.modifier = LSHIFT;
+
+		  USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS, &customHID, sizeof(struct customHID_t)); //Send HID report with selected button
+		  HAL_Delay(10);
+		  USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS, &customHID, sizeof(struct customHID_t));
+		  HAL_Delay(10);
+		  customHID.modifier = 0;
+		  customHID.key[0] = 0;							//Release keys
+
+		  USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS, &customHID, sizeof(struct customHID_t)); //Send HID report with selected button		  adc_temp[adc_num] = adc_current;
+		  HAL_Delay(10);
+		  USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS, &customHID, sizeof(struct customHID_t)); //Send HID report with selected button		  adc_temp[adc_num] = adc_current;
+		  HAL_Delay(10);
+		  adc_temp[adc_num] = adc_current;
+
+	  }
+
+	  adc_num = (adc_num + 1)%5;
+	  ADCChangeChannel(adc_chan[adc_num]);				//configure adc to GPIO PA1
+	  HAL_ADC_Start(&hadc1);						//Do initial conversion
+	  HAL_ADC_PollForConversion(&hadc1, 200);
+	  adc_current = HAL_ADC_GetValue(&hadc1);		//initialize variable for adc conversions
+	  HAL_ADC_Stop(&hadc1);
+
+	  //HAL_Delay(5);
+	  USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS, &customHID, sizeof(struct customHID_t));
+
 
   }
   /* USER CODE END 3 */
@@ -245,6 +330,27 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void ADCChangeChannel(uint32_t channel){
+
+	ADC_ChannelConfTypeDef sConfig;
+
+	sConfig.Channel = channel;
+	sConfig.Rank = 1;
+	sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+	{
+		_Error_Handler(__FILE__, __LINE__);
+	}
+}
+uint32_t ADCNext(uint32_t adcnow){
+	uint32_t adc_ret = 0;
+	ADCChangeChannel(adcnow);				//configure adc to GPIO PA1
+	HAL_ADC_Start(&hadc1);						//Do initial conversion
+	HAL_ADC_PollForConversion(&hadc1, 200);
+	adc_ret = HAL_ADC_GetValue(&hadc1);		//initialize variable for adc conversions
+	HAL_ADC_Stop(&hadc1);
+	return adc_ret;
+}
 
 /* USER CODE END 4 */
 
